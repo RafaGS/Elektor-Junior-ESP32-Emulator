@@ -4,6 +4,8 @@
 
 ---
 
+@<img src="./images/main.png" title="" alt="" data-align="center">
+
 <a id="english-version"></a>
 
 ## English Version
