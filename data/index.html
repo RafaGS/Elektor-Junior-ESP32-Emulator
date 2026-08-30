@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Elektor Junior Emulator</title>
+    <!-- Cargar fuente Nunito -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+      :root {
+        --bg-color: #1a1a1a;
+        --panel-bg: #2d2d2d;
+        --led-off: #3a1010;
+        --led-on: #ff1010;
+        --btn-bg: #e0e0e0;
+        --btn-active: #aaaaaa;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: var(--bg-color);
+        color: white;
+        font-family: "Courier New", Courier, monospace;
+        touch-action: none;
+      }
+
+      #display-board {
+        display: flex;
+        gap: 15px;
+        padding: 20px;
+        margin-bottom: 30px;
+        background: var(--panel-bg);
+        border: 2px solid #444;
+        border-radius: 10px;
+        box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+      }
+
+      .digit {
+        position: relative;
+        width: 50px;
+        height: 80px;
+      }
+
+      .seg {
+        fill: var(--led-off);
+        transition: fill 0.05s ease;
+      }
+
+      .seg.on {
+        fill: var(--led-on);
+        filter: drop-shadow(0px 0px 4px var(--led-on));
+      }
+
+#keyboard-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        width: min(720px, 92vw);
+      }
+
+      .hardware-board {
+        display: flex;
+        gap: 30px;
+        background: var(--panel-bg);
+        padding: 25px;
+        border-radius: 10px;
+        border: 2px solid #444;
+      }
+
+      .hex-pad {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+
+      .cmd-pad {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .emu-pad {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        background: #1e1e1e;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px dashed #555;
+      }
+
+.key {
+        padding: 15px 20px;
+        min-width: 60px;
+        border: 2px solid #999;
+        border-radius: 5px;
+        background: var(--btn-bg);
+        color: #111;
+        font-size: 1.2rem;
+        font-weight: bold;
+        cursor: pointer;
+        user-select: none;
+        box-shadow: 2px 2px 0 #111;
+        /* Se añade 'filter' a la transición para un cambio suave */
+        transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+      }
+
+      /* Efecto 3D: Elevación al pasar el ratón */
+      .key:hover {
+        transform: translate(-2px, -2px); /* Se eleva en diagonal */
+        box-shadow: 4px 4px 0 #111;        /* La sombra crece para dar profundidad */
+        filter: brightness(1.1);          /* Ligero brillo extra */
+      }
+
+      /* Efecto 3D: Hundimiento al pulsar */
+      .key:active,
+      .key.active {
+        background: var(--btn-active);
+        transform: translate(2px, 2px);   /* Se desplaza hacia la sombra */
+        box-shadow: none;                 /* La sombra desaparece al tocar el fondo */
+        filter: none;
+      }
+
+      .key-special {
+        background: #d4a373 !important;
+      }
+
+      .key-emu {
+        background: #6c7a89 !important;
+        color: white;
+        font-size: 0.9rem;
+        padding: 10px 15px;
+      }
+
+      /* Oculta el <br> sobrante cuando hay un <small> arriba */
+      .key br {
+          display: none;
+      }
+
+      /* Ajuste fino para la etiqueta <small> */
+      .key small {
+          font-size: 0.65rem;       /* Texto bien pequeño */
+          font-weight: bold;    
+          display: block;          /* Salto de línea único y controlado */
+          line-height: 1;          /* Pega el texto a su propio borde */
+          margin-bottom: 2px;      /* Distancia exacta de 2px con respecto a la letra grande */
+          opacity: 0.85;           /* Ligera transparencia para jerarquía visual */
+      }
+
+      .spacer {
+        /* Espacio vacío para el LED del pad de comandos */
+        visibility: hidden; 
+      }
+
+.switches-area {
+        display: flex;
+        justify-content: flex-end;
+        gap: 40px;
+        width: 100%;
+        padding-right: 30px;
+        margin-bottom: -15px;
+        z-index: 10;
+      }
+
+      .toggle-switch {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: #ccc;
+        font-size: 0.9rem;
+        font-weight: bold;
+      }
+
+      .switch-lever {
+        width: 24px;
+        height: 48px;
+        background: #444;
+        border: 2px solid #111;
+        border-radius: 4px;
+        margin-top: 5px;
+        position: relative;
+        cursor: pointer;
+        box-shadow: inset 2px 2px 5px rgba(0,0,0,0.6);
+      }
+
+      .switch-lever::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 50%;
+        background: #bbb;
+        border-bottom: 3px solid #777;
+        top: 0;
+        left: 0;
+        border-radius: 2px;
+        transition: top 0.1s ease-in-out;
+      }
+
+      .toggle-switch.on .switch-lever::after {
+        top: 50%;
+        border-bottom: none;
+        border-top: 3px solid #777;
+      }
+
+      .led-spacer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .led {
+        width: 16px;
+        height: 16px;
+        background: #3a0000;
+        border-radius: 50%;
+        box-shadow: inset -2px -2px 4px rgba(0,0,0,0.6), 0 0 2px #000;
+        transition: background 0.1s, box-shadow 0.1s;
+      }
+
+      .led.on {
+        background: #ff1010;
+        box-shadow: inset -2px -2px 4px rgba(0,0,0,0.2), 0 0 8px #ff1010, 0 0 15px #ff1010;
+      }
+
+      #status {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        color: #888;
+      }
+
+      /* Contenedor principal para alinear a la derecha */
+      #footer-container {
+        width: min(720px, 92vw); /* Mismo ancho que el teclado para alinear perfecto */
+        text-align: right; /* Alineación a la derecha */
+        margin-top: 40px;
+        margin-bottom: 20px;
+        color: #aaaaaa; /* Color gris para el texto "by" */
+        font-size: 1rem; /* Tamaño de fuente normal de la página para el "by" */
+      }
+
+      /* Estilos exclusivos para el enlace (minibots) */
+      .nunito-logo {
+        font-family: 'Nunito', sans-serif;
+        font-size: 2rem; /* Tamaño más grande para destacar el logo */
+        font-weight: 700;
+        color: #ffffff; /* Color de "mini" */
+        letter-spacing: -1px;
+        text-decoration: none; /* Quita el subrayado del enlace */
+        margin-left: 8px; /* Separación entre "by" y el logo */
+        transition: opacity 0.2s ease;
+        vertical-align: middle; /* Alinea ópticamente el logo grande con el texto pequeño */
+      }
+
+      /* Efecto al pasar el ratón por encima del enlace */
+      .nunito-logo:hover {
+        opacity: 0.8;
+      }
+      
+      .nunito-logo .teal-text {
+        color: #00bfa5; /* Color verde/azulado de "bots" */
+      } 
+    </style>
+  </head>
+  <body>
+    <h2>ELEKTOR JUNIOR COMPUTER</h2>
+
+    <div id="display-board"></div>
+
+<div id="keyboard-area">
+      
+      <!-- Zona de Interruptores Superiores -->
+      <div class="switches-area">
+        <div class="toggle-switch" id="sw-step">
+          <span>STEP</span>
+          <div class="switch-lever"></div>
+        </div>
+        <div class="toggle-switch on" id="sw-display">
+          <span>DISPLAY</span>
+          <div class="switch-lever"></div>
+        </div>
+      </div>
+
+      <!-- Teclado físico original -->
+      <div class="hardware-board">
+        
+        <div class="hex-pad">
+          <button class="key" data-key="C">C</button>
+          <button class="key" data-key="D">D</button>
+          <button class="key" data-key="E">E</button>
+          <button class="key" data-key="F">F</button>
+          
+          <button class="key" data-key="8">8</button>
+          <button class="key" data-key="9">9</button>
+          <button class="key" data-key="A">A</button>
+          <button class="key" data-key="B">B</button>
+          
+          <button class="key" data-key="4">4</button>
+          <button class="key" data-key="5">5</button>
+          <button class="key" data-key="6">6</button>
+          <button class="key" data-key="7">7</button>
+          
+          <button class="key" data-key="0">0</button>
+          <button class="key" data-key="1">1</button>
+          <button class="key" data-key="2">2</button>
+          <button class="key" data-key="3">3</button>
+        </div>
+
+        <div class="cmd-pad">
+          <button class="key key-special" data-key="PC"><small>SEARCH</small><br>PC</button>
+          
+          <!-- LED Rojo Físico (D2) -->
+          <div class="led-spacer"><div class="led" id="step-led"></div></div>
+          
+          <button class="key key-special" data-key="AD"><small>INSERT</small><br>AD</button>
+          <button class="key key-special" data-key="GO">GO</button>
+          
+          <button class="key key-special" data-key="DA"><small>DELETE</small><br>DA</button>
+          <button class="key key-special" data-key="NMI"><small>NMI</small><br>ST</button>
+          
+          <button class="key key-special" data-key="PL"><small>SKIP</small><br>+</button>
+          <button class="key key-special" data-key="RST">RST</button>
+        </div>
+
+      </div>
+
+      <!-- Botones extra del Emulador ESP32 -->
+      <div class="emu-pad">
+        <button class="key key-emu" data-key="TRACE">TRACE LOG</button>
+      </div>
+    </div>
+
+    <div id="status">Desconectado</div>
+
+    <!-- Contenedor al pie de página alineado a la derecha -->
+    <div id="footer-container">
+      by <a href="https://minibots.wordpress.com" class="nunito-logo">mini<span class="teal-text">bots</span></a>
+    </div>
+
+    <script>
+      const displayBoard = document.getElementById('display-board');
+      const statusDiv = document.getElementById('status');
+      const digitSVG = `
+        <svg viewBox="0 0 57 80" width="100%" height="100%" aria-hidden="true">
+          <polygon class="seg" data-bit="0" points="11,2 45,2 41,10 15,10" />
+          <polygon class="seg" data-bit="1" points="47,4 47,35 39,31 39,12" />
+          <polygon class="seg" data-bit="2" points="47,43 47,74 39,66 39,47" />
+          <polygon class="seg" data-bit="3" points="11,76 45,76 41,68 15,68" />
+          <polygon class="seg" data-bit="4" points="9,43 9,74 17,66 17,47" />
+          <polygon class="seg" data-bit="5" points="9,4 9,35 17,31 17,12" />
+          <polygon class="seg" data-bit="6" points="13,39 43,39 39,44 17,44" />
+        </svg>
+      `;
+
+      const segmentBitMap = {
+        0: 0,
+        1: 1,
+        2: 2,
+        3: 3,
+        4: 4,
+        5: 5,
+        6: 6
+      };
+
+      for (let i = 0; i < 6; ++i) {
+        const div = document.createElement('div');
+        div.className = 'digit';
+        div.id = 'digit-' + i;
+        div.innerHTML = digitSVG;
+        displayBoard.appendChild(div);
+      }
+
+      let ws = null;
+
+      function connectWebSocket() {
+        const wsUrl = `ws://${window.location.hostname}/ws`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          statusDiv.textContent = 'Conectado al emulador de Elektor Junior';
+          statusDiv.style.color = '#4caf50';
+
+          // Forzar el estado visual correcto al conectar
+          if (!document.getElementById('sw-display').classList.contains('on')) {
+            updateDisplay([0, 0, 0, 0, 0, 0]);
+          }
+        };
+
+        ws.onclose = () => {
+          statusDiv.textContent = 'Desconectado. Reconectando...';
+          statusDiv.style.color = '#f44336';
+          setTimeout(connectWebSocket, 2000);
+        };
+
+        ws.onerror = () => {
+          statusDiv.textContent = 'Error de WebSocket';
+          statusDiv.style.color = '#f44336';
+          if (ws) {
+            ws.close();
+          }
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            // BLOQUEO DE SEGURIDAD: Si la palanca visual está en OFF, 
+            // ignoramos cualquier dato que venga del ESP32 y salimos.
+            if (!document.getElementById('sw-display').classList.contains('on')) {
+              return;
+            }              
+            const message = JSON.parse(event.data);
+            const displayData = Array.isArray(message.display)
+              ? message.display
+              : Array.isArray(message.d)
+                ? message.d
+                : null;
+
+            if (displayData && displayData.length === 6) {
+              updateDisplay(displayData);
+            }
+          } catch (error) {
+            console.error('JSON invalido recibido:', error);
+          }
+        };
+      }
+
+      function updateDisplay(digits) {
+        if (!Array.isArray(digits) || digits.length !== 6) {
+          return;
+        }
+
+        digits.forEach((value, index) => {
+          const digitElement = document.getElementById('digit-' + index);
+          if (!digitElement) return;
+
+          const segments = digitElement.querySelectorAll('.seg');
+          segments.forEach((segment) => {
+            const bitIndex = Number(segment.getAttribute('data-bit'));
+            const bitMask = 1 << bitIndex;
+            segment.classList.toggle('on', (Number(value) & bitMask) !== 0);
+          });
+        });
+      }
+
+      function sendKey(key, pressed) {
+        console.log('[WebUI] sending key:', key, 'pressed:', pressed);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ key, pressed }));
+        }
+      }
+
+
+// Estado de los interruptores físicos
+      let stepModeActive = false;
+      
+      // Manejo de Interruptores de Palanca
+      document.getElementById('sw-step').addEventListener('click', function() {
+        stepModeActive = !stepModeActive;
+        this.classList.toggle('on', stepModeActive);
+        document.getElementById('step-led').classList.toggle('on', stepModeActive);
+        
+        // El interruptor STEP pausa/reanuda la CPU en el ESP32
+        sendKey('STOP', true);
+        setTimeout(() => sendKey('STOP', false), 50);
+      });
+
+      document.getElementById('sw-display').addEventListener('click', function() {
+        // Alternamos la clase visual y guardamos si ha quedado encendido o apagado
+        const isNowOn = this.classList.toggle('on');
+        
+        // Si el interruptor acaba de pasar a OFF (hacia arriba), apagamos todos los segmentos
+        if (!isNowOn) {
+          updateDisplay([0, 0, 0, 0, 0, 0]);
+        }
+        
+        // El interruptor DISPLAY apaga/enciende el envío de datos desde el ESP32
+        sendKey('DISPLAY', true);
+        setTimeout(() => sendKey('DISPLAY', false), 50);
+      });
+
+      // Manejo de pulsaciones de matriz y comandos dinámicos
+      document.querySelectorAll('.key').forEach((button) => {
+        button.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          button.classList.add('active');
+          
+          let keyToSend = button.getAttribute('data-key');
+          // Rutear dinámicamente la tecla GO
+          if (keyToSend === 'GO' && stepModeActive) {
+             keyToSend = 'STEP'; // Avanza 1 instrucción en vez de lanzar matriz
+          }
+          sendKey(keyToSend, true);
+        });
+
+        button.addEventListener('pointerup', (event) => {
+          event.preventDefault();
+          button.classList.remove('active');
+          
+          let keyToSend = button.getAttribute('data-key');
+          if (keyToSend === 'GO' && stepModeActive) {
+             keyToSend = 'STEP';
+          }
+          sendKey(keyToSend, false);
+        });
+
+        button.addEventListener('pointerleave', () => {
+          button.classList.remove('active');
+          let keyToSend = button.getAttribute('data-key');
+          if (keyToSend === 'GO' && stepModeActive) keyToSend = 'STEP';
+          sendKey(keyToSend, false);
+        });
+      });
+
+      connectWebSocket();
+    </script>
+  </body>
+</html>
