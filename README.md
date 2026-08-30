@@ -10,7 +10,7 @@
 
 ## English Version
 
-More information at [Minibots](https://minibots.wordpress.com/).
+More information at [Minibots](https://minibots.wordpress.com/2026/08/31/emulador-de-elektor-junior-computer-con-esp32/).
 
 This project is a complete emulator of the classic Elektor Junior trainer computer (based on the [KIM-1](https://minibots.wordpress.com/2026/06/10/emulador-de-mos-kim-1-con-arduino-uno-r3/) architecture), specifically designed to run on an ESP32 microcontroller. It stands out for offering a precise simulation of the original hardware through an interactive and asynchronous web interface.
 
@@ -52,7 +52,7 @@ This project is licensed under the **GNU General Public License v2.0**. See the 
 
 ## Versión en Español
 
-Más información en [Minibots](https://minibots.wordpress.com/).
+Más información en [Minibots](https://minibots.wordpress.com/2026/08/31/emulador-de-elektor-junior-computer-con-esp32/).
 
 Este proyecto es un emulador completo del clásico ordenador de 
 entrenamiento Elektor Junior (basado en la arquitectura del [KIM-1](https://minibots.wordpress.com/2026/06/10/emulador-de-mos-kim-1-con-arduino-uno-r3/), diseñado específicamente para ejecutarse en un microcontrolador ESP32. Destaca por ofrecer una simulación precisa del hardware original a través de una interfaz web interactiva y asíncrona.
