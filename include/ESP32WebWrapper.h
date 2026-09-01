@@ -25,6 +25,7 @@ public:
     void runCpuBatch(int instruction_count);
     bool isPaused() const noexcept { return paused_.load(std::memory_order_acquire); }
     bool isDisplayEnabled() const noexcept { return display_enabled_.load(std::memory_order_acquire); }
+    bool isStepMode() const noexcept { return step_mode_.load(std::memory_order_acquire); }
 
 private:
 #if defined(ARDUINO)
@@ -47,6 +48,17 @@ private:
     std::array<uint8_t, 6> display_snapshot_{};
     std::atomic<bool> paused_{false};
     std::atomic<bool> display_enabled_{true};
+    // Interruptor STEP (S24) real del Junior: mientras esta activo, la
+    // linea NMI del 6502 queda a nivel bajo y CADA pulsacion de la tecla
+    // GO (rotulada STEP/GO en ese modo) ejecuta exactamente UNA
+    // instruccion del programa reanudado antes de volver al monitor via
+    // NMI. A diferencia de paused_ (que congela TODA la CPU, incluido el
+    // bucle propio del monitor), step_mode_ no detiene nada por si solo
+    // - solo cambia lo que ocurre la proxima vez que GOEXEC arranque un
+    // programa. pending_step_nmi_ no necesita ser atomico: solo se lee
+    // y escribe dentro de runCpuBatch(), siempre desde la misma tarea.
+    std::atomic<bool> step_mode_{false};
+    bool pending_step_nmi_ = false;
 #endif
 
     JuniorMachine* machine_ = nullptr;

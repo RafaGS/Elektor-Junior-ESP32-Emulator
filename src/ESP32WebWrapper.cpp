@@ -172,15 +172,54 @@ void ESP32WebWrapper::runCpuBatch(int instruction_count) {
     // WiFi/AsyncTCP - acapararla tanto tiempo puede dejar sin CPU al
     // procesamiento de WebSocket el tiempo suficiente para que el
     // navegador de la conexion por muerta ("Desconectado.
-    // Reconectando..."). Se cede la CPU periodicamente dentro del lote
-    // para que esas tareas puedan intercalarse; coste practicamente
-    // nulo cuando la traza esta apagada (taskYIELD() no bloquea si no
-    // hay nada mas listo para ejecutar).
+    // Reconectando...").
+    //
+    // OJO: taskYIELD() NO es gratis solo porque "no haya nada mas listo
+    // para ejecutar" - si loop() o la pila WiFi/AsyncTCP SI tienen
+    // trabajo pendiente en ese instante, taskYIELD() les cede la CPU de
+    // verdad, y pueden tardar un rato en devolverla. Ceder cada 16
+    // instrucciones (hasta 16 veces por lote de 250) tiene un coste
+    // real y constante que antes se pagaba SIEMPRE, incluso con la
+    // traza apagada - donde el lote entero tarda microsegundos y este
+    // riesgo de bloqueo de UART ni siquiera existe. Por eso solo se
+    // cede la CPU periodicamente cuando la traza esta realmente activa
+    // (el unico escenario que de verdad lo necesita); con la traza
+    // apagada no se cede nada dentro del lote, y vTaskDelay(1) al
+    // volver a main.cpp ya cede la CPU de forma natural entre lotes.
+    const bool tracing = machine_->traceEnabled();
     static constexpr int kYieldEvery = 16;
     for (int i = 0; i < instruction_count; ++i) {
+        const uint16_t pc_before = machine_->cpu().pc();
+        const bool was_in_rom = (pc_before >= JuniorMachine::kMonitorStart &&
+                                  pc_before <= JuniorMachine::kMonitorEnd);
+
         machine_->cpu().step();
         machine_->tick();
-        if ((i % kYieldEvery) == (kYieldEvery - 1)) {
+
+        if (pending_step_nmi_) {
+            // Ya dejamos correr la primera instruccion del programa
+            // reanudado (la que aterrizo en RAM tras el RTI de GOEXEC);
+            // esta es esa instruccion, ya ejecutada. Toca disparar el
+            // NMI ahora, exactamente como si el interruptor STEP
+            // mantuviera la linea NMI a nivel bajo en el hardware real.
+            machine_->cpu().nmi();
+            pending_step_nmi_ = false;
+        } else if (step_mode_.load(std::memory_order_relaxed)) {
+            const uint16_t pc_after = machine_->cpu().pc();
+            const bool now_in_rom = (pc_after >= JuniorMachine::kMonitorStart &&
+                                      pc_after <= JuniorMachine::kMonitorEnd);
+            if (was_in_rom && !now_in_rom) {
+                // Transicion ROM->RAM: la unica forma en que esto ocurre
+                // en este monitor es el "RTI" final de GOEXEC, que
+                // reanuda el programa del usuario en POINTL/POINTH. Con
+                // el interruptor STEP activo, se deja correr esa UNA
+                // instruccion (ya se ejecuta en la siguiente vuelta del
+                // bucle) y se dispara el NMI justo despues.
+                pending_step_nmi_ = true;
+            }
+        }
+
+        if (tracing && (i % kYieldEvery) == (kYieldEvery - 1)) {
             taskYIELD();
         }
     }
@@ -275,16 +314,21 @@ void ESP32WebWrapper::handleKeyInput(const char* key, bool pressed) {
         Serial.printf("[KeyTrace] action=STOP paused=%s\n", paused_ ? "true" : "false");
         return;
     }
-    if (key_name == "KEY_STEP") {
+    if (key_name == "KEY_STEPSW") {
+        // Interruptor STEP (S24) real del Junior. A diferencia de
+        // KEY_STOP, esto NO congela la CPU - el monitor sigue
+        // funcionando con normalidad (teclado, display...). Solo arma
+        // el modo en el que la PROXIMA vez que GOEXEC arranque un
+        // programa (via la tecla GO real, matriz), se ejecute una sola
+        // instruccion y se dispare NMI automaticamente para volver al
+        // monitor. Ver la deteccion de transicion ROM->RAM en
+        // runCpuBatch().
         if (!pressed) {
             return;
         }
-        if (!paused_) {
-            paused_ = true;
-        }
-        Serial.println("[KeyTrace] action=STEP");
-        machine_->cpu().step();
-        machine_->tick();
+        const bool enabled = !step_mode_.load(std::memory_order_relaxed);
+        step_mode_.store(enabled, std::memory_order_relaxed);
+        Serial.printf("[KeyTrace] action=STEPSW step_mode=%s\n", enabled ? "true" : "false");
         return;
     }
     if (key_name == "KEY_DBGSTEP") {

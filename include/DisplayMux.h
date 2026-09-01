@@ -3,6 +3,22 @@
 #include <atomic>
 #include <cstdint>
 
+// Los tres campos se escriben desde JuniorMachine::write() (tarea de
+// CPU) y se leen desde ESP32WebWrapper::broadcastDisplay() (tarea de
+// loop()) - por eso son atomic, para evitar la misma clase de carrera
+// entre nucleos que ya se corrigio en JuniorKeyboard.
+//
+// A proposito se usa memory_order_relaxed, no acquire/release: a
+// diferencia del teclado (donde perder o retrasar la visibilidad de una
+// pulsacion es un fallo funcional real), aqui el peor caso de una
+// lectura ligeramente rezagada es que UN fotograma del display muestre
+// una combinacion de digito/segmento de una escritura muy cercana en el
+// tiempo a otra - un parpadeo cosmetico invisible en la practica, ya que
+// esta funcion de escritura se llama en el bucle de refresco del
+// monitor con una frecuencia mucho mayor que el teclado. Pagar el coste
+// de una barrera de memoria completa en cada escritura, en el camino
+// mas caliente de toda la emulacion, no esta justificado para esa
+// garantia extra.
 class DisplayMux {
 public:
     static constexpr std::size_t kDigitCount = 6;
@@ -12,14 +28,14 @@ public:
 
     void setSegments(uint8_t segments) {
         const uint8_t masked = segments & 0x7FU;
-        segment_pattern_.store(static_cast<uint8_t>((0x7FU ^ masked) & 0x7FU), std::memory_order_release);
+        segment_pattern_.store(static_cast<uint8_t>((0x7FU ^ masked) & 0x7FU), std::memory_order_relaxed);
     }
 
     // digit_index debe ser ya la posicion fisica del digito (0..5),
     // NO la linea cruda del 7442. Ver JuniorMachine::write() para el mapeo.
     void setSelectedDigit(uint8_t digit_index) {
-        selected_digit_.store(digit_index, std::memory_order_release);
-        digit_valid_.store(digit_index < kDigitCount, std::memory_order_release);
+        selected_digit_.store(digit_index, std::memory_order_relaxed);
+        digit_valid_.store(digit_index < kDigitCount, std::memory_order_relaxed);
     }
 
     // Se debe llamar cuando el 7442 esta en una linea que no corresponde
@@ -28,19 +44,19 @@ public:
     // websocket) puede quedarse pegado a un digito que ya no esta
     // realmente seleccionado en el hardware.
     void clearSelectedDigit() {
-        digit_valid_.store(false, std::memory_order_release);
+        digit_valid_.store(false, std::memory_order_relaxed);
     }
 
     uint8_t segmentPattern() const noexcept {
-        return segment_pattern_.load(std::memory_order_acquire);
+        return segment_pattern_.load(std::memory_order_relaxed);
     }
 
     uint8_t selectedDigit() const noexcept {
-        return selected_digit_.load(std::memory_order_acquire);
+        return selected_digit_.load(std::memory_order_relaxed);
     }
 
     bool digitSelected() const noexcept {
-        return digit_valid_.load(std::memory_order_acquire);
+        return digit_valid_.load(std::memory_order_relaxed);
     }
 
     struct DigitState {
@@ -51,9 +67,9 @@ public:
 
     DigitState current() const noexcept {
         return { 
-            selected_digit_.load(std::memory_order_acquire), 
-            segment_pattern_.load(std::memory_order_acquire), 
-            digit_valid_.load(std::memory_order_acquire) 
+            selected_digit_.load(std::memory_order_relaxed), 
+            segment_pattern_.load(std::memory_order_relaxed), 
+            digit_valid_.load(std::memory_order_relaxed) 
         };
     }
 

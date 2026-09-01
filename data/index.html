@@ -461,18 +461,25 @@
       }
 
 
-// Estado de los interruptores físicos
+// Estado del interruptor STEP: solo para reflejarlo visualmente (LED,
+// clase 'on'). El propio ESP32 lleva el estado real (step_mode_) y
+// decide que hacer cuando llegue la tecla GO - aqui no se reencamina
+// nada, GO siempre se manda tal cual y pasa por la matriz real.
       let stepModeActive = false;
-      
+
       // Manejo de Interruptores de Palanca
       document.getElementById('sw-step').addEventListener('click', function() {
         stepModeActive = !stepModeActive;
         this.classList.toggle('on', stepModeActive);
         document.getElementById('step-led').classList.toggle('on', stepModeActive);
-        
-        // El interruptor STEP pausa/reanuda la CPU en el ESP32
-        sendKey('STOP', true);
-        setTimeout(() => sendKey('STOP', false), 50);
+
+        // El interruptor STEP real del Junior no detiene nada por si
+        // solo (el monitor sigue funcionando con normalidad); solo
+        // cambia lo que pasa la proxima vez que se pulse GO. Por eso se
+        // manda una tecla propia (STEPSW), distinta de STOP (que si
+        // congela toda la CPU para el paso a paso de depuracion).
+        sendKey('STEPSW', true);
+        setTimeout(() => sendKey('STEPSW', false), 50);
       });
 
       document.getElementById('sw-display').addEventListener('click', function() {
@@ -489,36 +496,26 @@
         setTimeout(() => sendKey('DISPLAY', false), 50);
       });
 
-      // Manejo de pulsaciones de matriz y comandos dinámicos
+      // Manejo de pulsaciones de matriz y comandos dinámicos. GO se
+      // manda siempre tal cual - es el ESP32 quien decide, segun el
+      // estado de step_mode_, si GOEXEC debe dejar correr el programa
+      // entero o solo una instruccion (ver runCpuBatch en el firmware).
       document.querySelectorAll('.key').forEach((button) => {
         button.addEventListener('pointerdown', (event) => {
           event.preventDefault();
           button.classList.add('active');
-          
-          let keyToSend = button.getAttribute('data-key');
-          // Rutear dinámicamente la tecla GO
-          if (keyToSend === 'GO' && stepModeActive) {
-             keyToSend = 'STEP'; // Avanza 1 instrucción en vez de lanzar matriz
-          }
-          sendKey(keyToSend, true);
+          sendKey(button.getAttribute('data-key'), true);
         });
 
         button.addEventListener('pointerup', (event) => {
           event.preventDefault();
           button.classList.remove('active');
-          
-          let keyToSend = button.getAttribute('data-key');
-          if (keyToSend === 'GO' && stepModeActive) {
-             keyToSend = 'STEP';
-          }
-          sendKey(keyToSend, false);
+          sendKey(button.getAttribute('data-key'), false);
         });
 
         button.addEventListener('pointerleave', () => {
           button.classList.remove('active');
-          let keyToSend = button.getAttribute('data-key');
-          if (keyToSend === 'GO' && stepModeActive) keyToSend = 'STEP';
-          sendKey(keyToSend, false);
+          sendKey(button.getAttribute('data-key'), false);
         });
       });
 
