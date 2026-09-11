@@ -1,3 +1,15 @@
+/*
+  Elektor Junior ESP32 Emulator
+  
+  Created by RafaGS - <https://minibots.wordpress.com>
+  Copyright (c) 2026. Rafael Gómez
+  All rights reserved.
+
+* Please contact me if you need a commercial license.
+* This library and related software is available under GPL v2.
+ */
+
+
 #if defined(ARDUINO)
 #include <Arduino.h>
 
